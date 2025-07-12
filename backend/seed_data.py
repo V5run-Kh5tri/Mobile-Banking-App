@@ -79,7 +79,7 @@ async def seed_database():
     ]
     
     for transaction in sample_transactions:
-        await db.transactions.insert_one(transaction.dict())
+        await db.transactions.insert_one(transaction.model_dump())
     
     print(f"Created {len(sample_transactions)} sample transactions")
     
