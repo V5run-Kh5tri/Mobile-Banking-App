@@ -2,24 +2,25 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { transactionAPI } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ArrowLeft, Send, User, Phone, CreditCard, Lock } from 'lucide-react';
-import { mockRecentContacts } from '../data/mockData';
+import { ArrowLeft, Send } from 'lucide-react';
 
 const SendMoney = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, updateBalance } = useAuth();
+  const { user, refreshUserData } = useAuth();
   const { addToast } = useToast();
   
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    recipientName: '',
-    recipientAccount: '',
-    recipientPhone: '',
+    recipient_name: '',
+    recipient_account: '',
+    recipient_phone: '',
     amount: location.state?.amount || '',
     description: '',
     pin: ''
@@ -32,18 +33,9 @@ const SendMoney = () => {
     }));
   };
 
-  const handleContactSelect = (contact) => {
-    setFormData(prev => ({
-      ...prev,
-      recipientName: contact.name,
-      recipientAccount: contact.accountNumber,
-      recipientPhone: contact.phone
-    }));
-  };
-
   const handleNext = () => {
     if (step === 1) {
-      if (!formData.recipientName || !formData.recipientAccount) {
+      if (!formData.recipient_name || !formData.recipient_account) {
         addToast('Please fill in recipient details', 'error');
         return;
       }
@@ -61,19 +53,32 @@ const SendMoney = () => {
     }
   };
 
-  const handleSendMoney = (e) => {
+  const handleSendMoney = async (e) => {
     e.preventDefault();
     if (formData.pin.length !== 4) {
       addToast('Please enter 4-digit PIN', 'error');
       return;
     }
 
-    // Simulate transaction
-    const amount = parseFloat(formData.amount);
-    updateBalance(-amount);
-    
-    addToast('Money sent successfully!', 'success');
-    navigate('/');
+    setLoading(true);
+    try {
+      const response = await transactionAPI.sendMoney({
+        recipient_name: formData.recipient_name,
+        recipient_account: formData.recipient_account,
+        recipient_phone: formData.recipient_phone,
+        amount: parseFloat(formData.amount),
+        description: formData.description,
+        pin: formData.pin
+      });
+
+      await refreshUserData();
+      addToast('Money sent successfully!', 'success');
+      navigate('/');
+    } catch (error) {
+      addToast(error.response?.data?.detail || 'Failed to send money', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -118,67 +123,41 @@ const SendMoney = () => {
           <div className="space-y-6">
             <Card className="bg-white border-gray-200">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-gray-900">Select Recipient</CardTitle>
+                <CardTitle className="text-lg font-semibold text-gray-900">Recipient Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="recipientName">Recipient Name</Label>
+                  <Label htmlFor="recipient_name">Recipient Name</Label>
                   <Input
-                    id="recipientName"
-                    name="recipientName"
-                    value={formData.recipientName}
+                    id="recipient_name"
+                    name="recipient_name"
+                    value={formData.recipient_name}
                     onChange={handleInputChange}
                     placeholder="Enter recipient name"
                     className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="recipientAccount">Account Number</Label>
+                  <Label htmlFor="recipient_account">Account Number</Label>
                   <Input
-                    id="recipientAccount"
-                    name="recipientAccount"
-                    value={formData.recipientAccount}
+                    id="recipient_account"
+                    name="recipient_account"
+                    value={formData.recipient_account}
                     onChange={handleInputChange}
                     placeholder="Enter account number"
                     className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="recipientPhone">Phone Number (Optional)</Label>
+                  <Label htmlFor="recipient_phone">Phone Number (Optional)</Label>
                   <Input
-                    id="recipientPhone"
-                    name="recipientPhone"
-                    value={formData.recipientPhone}
+                    id="recipient_phone"
+                    name="recipient_phone"
+                    value={formData.recipient_phone}
                     onChange={handleInputChange}
                     placeholder="Enter phone number"
                     className="w-full"
                   />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Contacts */}
-            <Card className="bg-white border-gray-200">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-gray-900">Recent Contacts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {mockRecentContacts.map((contact) => (
-                    <div
-                      key={contact.id}
-                      className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer transition-all duration-200"
-                      onClick={() => handleContactSelect(contact)}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold text-sm">{contact.avatar}</span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{contact.name}</p>
-                        <p className="text-sm text-gray-500">{contact.phone}</p>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -253,11 +232,11 @@ const SendMoney = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-gray-600">To:</span>
-                    <span className="font-medium">{formData.recipientName}</span>
+                    <span className="font-medium">{formData.recipient_name}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-gray-600">Account:</span>
-                    <span className="font-medium">{formData.recipientAccount}</span>
+                    <span className="font-medium">{formData.recipient_account}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100">
                     <span className="text-gray-600">Amount:</span>
@@ -290,10 +269,11 @@ const SendMoney = () => {
               
               <Button
                 type="submit"
+                disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <Send className="w-4 h-4 mr-2" />
-                Send Money
+                {loading ? 'Sending...' : 'Send Money'}
               </Button>
             </form>
           </div>

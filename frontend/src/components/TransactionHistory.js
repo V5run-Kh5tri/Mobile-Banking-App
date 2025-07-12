@@ -1,25 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../contexts/ToastContext';
+import { transactionAPI } from '../services/api';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ArrowLeft, Search, Filter, Download, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
-import { mockTransactions } from '../data/mockData';
 
 const TransactionHistory = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
 
-  const filteredTransactions = mockTransactions.filter(transaction => {
-    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || transaction.type === filterType;
-    const matchesCategory = filterCategory === 'all' || transaction.category === filterCategory;
-    
-    return matchesSearch && matchesType && matchesCategory;
-  });
+  useEffect(() => {
+    loadTransactions();
+  }, [filterType, filterCategory]);
+
+  const loadTransactions = async () => {
+    try {
+      setLoading(true);
+      const params = {};
+      if (filterType !== 'all') params.type = filterType;
+      if (filterCategory !== 'all') params.category = filterCategory;
+      
+      const response = await transactionAPI.getHistory(params);
+      setTransactions(response.data);
+    } catch (error) {
+      addToast('Failed to load transactions', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredTransactions = transactions.filter(transaction => 
+    transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -38,12 +58,11 @@ const TransactionHistory = () => {
   };
 
   const getUniqueCategories = () => {
-    const categories = [...new Set(mockTransactions.map(t => t.category))];
+    const categories = [...new Set(transactions.map(t => t.category))];
     return categories.sort();
   };
 
   const exportTransactions = () => {
-    // Mock export functionality
     const csvContent = "Date,Description,Type,Amount,Category\n" +
       filteredTransactions.map(t => 
         `${formatDate(t.date)},${t.description},${t.type},${t.amount},${t.category}`
@@ -56,6 +75,7 @@ const TransactionHistory = () => {
     a.download = 'transactions.csv';
     a.click();
     URL.revokeObjectURL(url);
+    addToast('Transaction history exported!', 'success');
   };
 
   return (
@@ -142,7 +162,26 @@ const TransactionHistory = () => {
           </Button>
         </div>
 
-        {filteredTransactions.length === 0 ? (
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Card key={i} className="bg-white border-gray-200">
+                <CardContent className="p-4">
+                  <div className="animate-pulse">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                      <div className="h-4 bg-gray-200 rounded w-20"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredTransactions.length === 0 ? (
           <Card className="bg-white border-gray-200">
             <CardContent className="p-8 text-center">
               <Filter className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -152,7 +191,7 @@ const TransactionHistory = () => {
           </Card>
         ) : (
           <div className="space-y-3">
-            {filteredTransactions.map((transaction, index) => (
+            {filteredTransactions.map((transaction) => (
               <Card key={transaction.id} className="bg-white border-gray-200 hover:shadow-md transition-all duration-200">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -179,7 +218,7 @@ const TransactionHistory = () => {
                           </p>
                           <span className="text-xs text-gray-400">•</span>
                           <p className="text-sm text-gray-500">
-                            Balance: {formatCurrency(transaction.balance)}
+                            Balance: {formatCurrency(transaction.balance_after)}
                           </p>
                         </div>
                       </div>
