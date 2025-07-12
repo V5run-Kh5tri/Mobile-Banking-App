@@ -110,7 +110,7 @@ async def seed_database():
     ]
     
     for loan in sample_loans:
-        await db.loans.insert_one(loan.dict())
+        await db.loans.insert_one(loan.model_dump())
     
     print(f"Created {len(sample_loans)} sample loans")
     
