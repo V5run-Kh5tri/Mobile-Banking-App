@@ -264,14 +264,13 @@ metadata:
 
 test_plan:
   current_focus:
-    - "User Authentication API"
-    - "User Profile Management API"
-    - "Transaction Management API"
     - "Authentication Integration"
     - "Dashboard with Real Data"
     - "Send Money Integration"
+    - "Transaction History Integration"
+    - "API Service Layer"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
