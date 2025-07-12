@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { transactionAPI } from '../services/api';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { 
@@ -9,21 +11,36 @@ import {
   QrCode, 
   Eye, 
   EyeOff, 
-  Plus,
   ArrowUpRight,
   ArrowDownLeft,
   Clock,
   Bell,
   Settings
 } from 'lucide-react';
-import { mockTransactions } from '../data/mockData';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
+  const { addToast } = useToast();
   const navigate = useNavigate();
-  const [showBalance, setShowBalance] = React.useState(true);
+  const [showBalance, setShowBalance] = useState(true);
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const recentTransactions = mockTransactions.slice(0, 3);
+  useEffect(() => {
+    loadRecentTransactions();
+  }, []);
+
+  const loadRecentTransactions = async () => {
+    try {
+      const response = await transactionAPI.getRecent(3);
+      setRecentTransactions(response.data);
+    } catch (error) {
+      console.error('Failed to load recent transactions:', error);
+      addToast('Failed to load recent transactions', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const quickActions = [
     { icon: Send, label: 'Send Money', path: '/send-money', color: 'bg-blue-500' },
@@ -37,6 +54,13 @@ const Dashboard = () => {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   return (
@@ -53,6 +77,7 @@ const Dashboard = () => {
               variant="ghost"
               size="icon"
               className="text-white hover:bg-white/10"
+              onClick={() => addToast('Notifications feature coming soon!', 'info')}
             >
               <Bell className="w-5 h-5" />
             </Button>
@@ -60,6 +85,7 @@ const Dashboard = () => {
               variant="ghost"
               size="icon"
               className="text-white hover:bg-white/10"
+              onClick={() => navigate('/profile')}
             >
               <Settings className="w-5 h-5" />
             </Button>
@@ -87,8 +113,8 @@ const Dashboard = () => {
             </div>
             
             <div className="text-sm opacity-90">
-              <p>Account: {user?.accountNumber}</p>
-              <p>IFSC: {user?.ifscCode}</p>
+              <p>Account: {user?.account_number}</p>
+              <p>IFSC: {user?.ifsc_code}</p>
             </div>
           </CardContent>
         </Card>
@@ -131,40 +157,69 @@ const Dashboard = () => {
           </Button>
         </div>
         
-        <div className="space-y-3">
-          {recentTransactions.map((transaction) => (
-            <Card key={transaction.id} className="bg-white border-gray-200 hover:shadow-md transition-all duration-200">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      transaction.type === 'credit' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      {transaction.type === 'credit' ? (
-                        <ArrowDownLeft className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <ArrowUpRight className="w-5 h-5 text-red-600" />
-                      )}
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="bg-white border-gray-200">
+                <CardContent className="p-4">
+                  <div className="animate-pulse">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                      <div className="h-4 bg-gray-200 rounded w-20"></div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{transaction.description}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(transaction.date).toLocaleDateString()}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : recentTransactions.length === 0 ? (
+          <Card className="bg-white border-gray-200">
+            <CardContent className="p-8 text-center">
+              <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600">No recent transactions</p>
+              <p className="text-sm text-gray-500 mt-1">Your transactions will appear here</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {recentTransactions.map((transaction) => (
+              <Card key={transaction.id} className="bg-white border-gray-200 hover:shadow-md transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        transaction.type === 'credit' ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
+                        {transaction.type === 'credit' ? (
+                          <ArrowDownLeft className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <ArrowUpRight className="w-5 h-5 text-red-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{transaction.description}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatDate(transaction.date)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-bold ${
+                        transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-bold ${
-                      transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

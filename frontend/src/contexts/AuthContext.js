@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockUsers } from '../data/mockData';
+import { authAPI, userAPI } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -17,51 +17,98 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check if user is logged in from localStorage
+    const token = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('bankingUser');
-    if (savedUser) {
+    
+    if (token && savedUser) {
       setUser(JSON.parse(savedUser));
+      // Verify token with backend
+      authAPI.getCurrentUser()
+        .then(response => {
+          const userData = response.data;
+          setUser(userData);
+          localStorage.setItem('bankingUser', JSON.stringify(userData));
+        })
+        .catch(() => {
+          // Token is invalid
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('bankingUser');
+          setUser(null);
+        });
     }
     setLoading(false);
   }, []);
 
-  const login = (email, password) => {
-    // Mock login - in real app, this would call the backend
-    const foundUser = mockUsers.find(u => u.email === email && u.password === password);
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('bankingUser', JSON.stringify(userWithoutPassword));
+  const login = async (email, password) => {
+    try {
+      const response = await authAPI.login(email, password);
+      const { user: userData, access_token } = response.data;
+      
+      setUser(userData);
+      localStorage.setItem('authToken', access_token);
+      localStorage.setItem('bankingUser', JSON.stringify(userData));
+      
       return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Login failed' 
+      };
     }
-    return { success: false, error: 'Invalid credentials' };
   };
 
-  const signup = (userData) => {
-    // Mock signup - in real app, this would call the backend
-    const newUser = {
-      id: Date.now().toString(),
-      ...userData,
-      createdAt: new Date().toISOString(),
-      accountNumber: `ACC${Math.random().toString().slice(2, 12)}`,
-      balance: 10000, // Starting balance
-      ifscCode: 'BANK0001234'
-    };
-    const { password: _, ...userWithoutPassword } = newUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem('bankingUser', JSON.stringify(userWithoutPassword));
-    return { success: true };
+  const signup = async (userData) => {
+    try {
+      const response = await authAPI.signup(userData);
+      const { user: newUser, access_token } = response.data;
+      
+      setUser(newUser);
+      localStorage.setItem('authToken', access_token);
+      localStorage.setItem('bankingUser', JSON.stringify(newUser));
+      
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Signup failed' 
+      };
+    }
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('authToken');
     localStorage.removeItem('bankingUser');
   };
 
-  const updateBalance = (amount) => {
-    if (user) {
-      const updatedUser = { ...user, balance: user.balance + amount };
-      setUser(updatedUser);
-      localStorage.setItem('bankingUser', JSON.stringify(updatedUser));
+  const updateBalance = async (amount) => {
+    try {
+      const response = await userAPI.updateBalance(amount);
+      const newBalance = response.data.balance;
+      
+      if (user) {
+        const updatedUser = { ...user, balance: newBalance };
+        setUser(updatedUser);
+        localStorage.setItem('bankingUser', JSON.stringify(updatedUser));
+      }
+      
+      return { success: true, balance: newBalance };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Balance update failed' 
+      };
+    }
+  };
+
+  const refreshUserData = async () => {
+    try {
+      const response = await userAPI.getProfile();
+      const userData = response.data;
+      setUser(userData);
+      localStorage.setItem('bankingUser', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
     }
   };
 
@@ -72,6 +119,7 @@ export const AuthProvider = ({ children }) => {
       signup,
       logout,
       updateBalance,
+      refreshUserData,
       loading
     }}>
       {children}
