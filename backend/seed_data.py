@@ -149,7 +149,7 @@ async def seed_database():
     ]
     
     for investment in sample_investments:
-        await db.investments.insert_one(investment.dict())
+        await db.investments.insert_one(investment.model_dump())
     
     print(f"Created {len(sample_investments)} sample investments")
     
