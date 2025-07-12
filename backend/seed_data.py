@@ -26,7 +26,7 @@ async def seed_database():
         balance=45750.50
     )
     
-    await db.users.insert_one(sample_user.dict())
+    await db.users.insert_one(sample_user.model_dump())
     print(f"Created user: {sample_user.email}")
     
     # Create sample transactions
