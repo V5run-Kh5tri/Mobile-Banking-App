@@ -69,7 +69,12 @@ def make_request(method, endpoint, data=None, headers=None, params=None):
         if method.upper() == "GET":
             response = requests.get(url, headers=default_headers, params=params, timeout=10)
         elif method.upper() == "POST":
-            response = requests.post(url, headers=default_headers, json=data, timeout=10)
+            if params:
+                # For POST with query parameters
+                response = requests.post(url, headers=default_headers, params=params, timeout=10)
+            else:
+                # For POST with JSON body
+                response = requests.post(url, headers=default_headers, json=data, timeout=10)
         elif method.upper() == "PUT":
             response = requests.put(url, headers=default_headers, json=data, timeout=10)
         elif method.upper() == "DELETE":
