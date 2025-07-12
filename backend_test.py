@@ -327,7 +327,7 @@ def test_qr_payment():
         }
         
         response = make_request("POST", "/transactions/qr-payment", 
-                              data=qr_data, headers=get_auth_headers())
+                              params=qr_data, headers=get_auth_headers())
         
         if response.status_code == 200:
             payment_result = response.json()
