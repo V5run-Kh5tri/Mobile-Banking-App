@@ -134,7 +134,7 @@ async def seed_database():
             current_value=27000,
             returns=2000,
             returns_percent=8.0,
-            maturity_date=date.today() + timedelta(days=180)
+            maturity_date=datetime.combine(date.today() + timedelta(days=180), datetime.min.time())
         ),
         Investment(
             user_id=sample_user.id,
