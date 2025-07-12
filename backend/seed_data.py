@@ -105,7 +105,7 @@ async def seed_database():
             interest_rate=12.5,
             tenure=60,
             remaining_months=30,
-            next_due_date=date.today() + timedelta(days=10)
+            next_due_date=datetime.combine(date.today() + timedelta(days=10), datetime.min.time())
         )
     ]
     
