@@ -94,7 +94,7 @@ async def seed_database():
             interest_rate=8.5,
             tenure=240,
             remaining_months=180,
-            next_due_date=date.today() + timedelta(days=15)
+            next_due_date=datetime.combine(date.today() + timedelta(days=15), datetime.min.time())
         ),
         Loan(
             user_id=sample_user.id,
